@@ -12,7 +12,7 @@
 #include "driver/periph_ctrl.h"
 #include <driver/spi_common.h>
 
-void GDMADesc::begin(uint8_t *inputBuffer, uint16_t bufferSize){
+void DMADesc::begin(uint8_t *inputBuffer, uint16_t bufferSize){
   if(bufferSize >= 0xFFF) bufferSize = 0xFFF;
   buffer = inputBuffer;
   memset(buffer,0,bufferSize);
@@ -57,8 +57,8 @@ void DMASPI::initDMA(uint32_t descs, uint16_t length){
   if(dmaDescRX) delete dmaDescRX;
   if(dmaBufferTX) delete dmaBufferTX;
   if(dmaBufferRX) delete dmaBufferRX;
-  dmaDescTX = (GDMADesc*)heap_caps_malloc(sizeof(GDMADesc)*descs, MALLOC_CAP_DMA);
-  dmaDescRX = (GDMADesc*)heap_caps_malloc(sizeof(GDMADesc)*descs, MALLOC_CAP_DMA);
+  dmaDescTX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*descs, MALLOC_CAP_DMA);
+  dmaDescRX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*descs, MALLOC_CAP_DMA);
   dmaBufferTX = (uint8_t*)heap_caps_malloc(length*descs, MALLOC_CAP_DMA);
   dmaBufferRX = (uint8_t*)heap_caps_malloc(length*descs, MALLOC_CAP_DMA);
   for(uint8_t i=0;i<descs;i++){

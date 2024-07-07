@@ -112,7 +112,7 @@ struct gdma_rx_channel_t {
     gdma_event_callback_t on_recv_eof; // RX EOF callback
 };
 
-class GDMADesc {
+class DMADesc {
 public:
   void begin(uint8_t *inputBuffer, uint16_t bufferSize);
   inline bool hasError(){ return err_eof; }
@@ -120,8 +120,8 @@ public:
   inline void setLast(bool isLast){ suc_eof = isLast; }
   inline bool isOwnedByDMA(){ return owner; }
   inline void setOwnedByDMA(bool ownedByDMA){ owner = ownedByDMA; }
-  inline void linkTo(GDMADesc* nextGDMADesc){ next = nextGDMADesc; }
-  inline void linkTo(GDMADesc& nextGDMADesc){ next = &nextGDMADesc; }
+  inline void linkTo(DMADesc* nextDMADesc){ next = nextDMADesc; }
+  inline void linkTo(DMADesc& nextDMADesc){ next = &nextDMADesc; }
   inline void *getBuffer() { return buffer; };
   inline void print(){
     Serial.print(size);
@@ -149,7 +149,7 @@ private:
       uint32_t owner : 1;         /*!< Who is allowed to access the buffer that this descriptor points to */
   };                          /*!< Descriptor Word 0 */
   void *buffer;                   /*!< Pointer to the buffer */
-  GDMADesc *next;  /*!< Pointer to the next descriptor (set to NULL if the descriptor is the last one, e.g. suc_eof=1) */
+  DMADesc *next;  /*!< Pointer to the next descriptor (set to NULL if the descriptor is the last one, e.g. suc_eof=1) */
 } __attribute__((aligned(4)));
 
 struct spi_struct_t {
@@ -197,8 +197,8 @@ public:
   }
   gdma_channel_handle_t dmaChannelRX;
   gdma_channel_handle_t dmaChannelTX;
-  GDMADesc *dmaDescTX;
-  GDMADesc *dmaDescRX;
+  DMADesc *dmaDescTX;
+  DMADesc *dmaDescRX;
   uint8_t *dmaBufferTX;
   uint8_t *dmaBufferRX;
 private:
