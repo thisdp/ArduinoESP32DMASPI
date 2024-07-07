@@ -1,4 +1,4 @@
-#include "GDMASPI.h"
+#include "ArduinoESP32GDMASPI.h"
 #include "esp32-hal-spi.h"
 
 void GDMADesc::begin(uint8_t *inputBuffer, uint16_t bufferSize){

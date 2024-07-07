@@ -1,4 +1,4 @@
-#include "GDMASPI.h"
+#include "ArduinoESP32DMASPI.h"
 #include "esp32-hal-spi.h"
 #include "driver/periph_ctrl.h"
 #include "esp32-hal-spi.h"
