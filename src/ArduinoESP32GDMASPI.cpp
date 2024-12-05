@@ -1,9 +1,9 @@
 #include "ArduinoESP32GDMASPI.h"
 #include "esp32-hal-spi.h"
 
-void DMADesc::begin(uint8_t *inputBuffer, uint16_t bufferSize){
+void GDMADesc::begin(uint16_t bufferSize){
   if(bufferSize >= 0xFFF) bufferSize = 0xFFF;
-  buffer = inputBuffer;
+  buffer = (uint8_t *)heap_caps_malloc(bufferSize,MALLOC_CAP_DMA);
   memset(buffer,0,bufferSize);
   size = bufferSize;
   length = bufferSize;
@@ -12,13 +12,16 @@ void DMADesc::begin(uint8_t *inputBuffer, uint16_t bufferSize){
   err_eof = 0;
 }
 
+void GDMADesc::end(){
+  if(buffer) heap_caps_free(buffer);
+}
+
 GDMASPI::GDMASPI(uint8_t host):SPIHost(host){}
 
 void GDMASPI::begin(int sck, int miso, int mosi, int cs) {
   SPIClass::begin(sck, miso, mosi, cs);
-  spi = bus();
+  spi = SPIClass::bus();
   spiAttachSS(spi, 0, cs);
-  spiSSEnable(spi);
   dmaDescTX = 0;
   dmaDescRX = 0;
   //TX
@@ -41,7 +44,7 @@ void GDMASPI::begin(int sck, int miso, int mosi, int cs) {
   gdma_new_channel(&dmaChannelConfigRX, &dmaChannelRX);
   static gdma_strategy_config_t strategyConfig = {
     .owner_check = false,
-    .auto_update_desc = true
+    .auto_update_desc = false
   };
   gdma_apply_strategy(dmaChannelTX, &strategyConfig);
   gdma_apply_strategy(dmaChannelRX, &strategyConfig);
@@ -63,42 +66,52 @@ void GDMASPI::begin(int sck, int miso, int mosi, int cs) {
   spi->dev->dma_conf.rx_eof_en = 1;
 
   spi->dev->cmd.update = 1;
-
-  
-  SPISettings settings(80000000,SPI_MSBFIRST,SPI_MODE0);
-  beginTransaction(settings);
 }
 
-void GDMASPI::initDMA(uint32_t descs, uint16_t length){
-  if(dmaDescTX) delete dmaDescTX;
-  if(dmaDescRX) delete dmaDescRX;
-  if(dmaBufferTX) delete dmaBufferTX;
-  if(dmaBufferRX) delete dmaBufferRX;
-  dmaDescTX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*descs, MALLOC_CAP_INTERNAL);
-  dmaDescRX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*descs, MALLOC_CAP_INTERNAL);
-  dmaBufferTX = (uint8_t*)heap_caps_malloc(length*descs, MALLOC_CAP_DMA);
-  dmaBufferRX = (uint8_t*)heap_caps_malloc(length*descs, MALLOC_CAP_DMA);
-  for(uint8_t i=0;i<descs;i++){
-    dmaDescTX[i].begin(&(dmaBufferTX[i*length]),length);
-    dmaDescTX[i].linkTo(dmaDescTX[(i+1)%descs]);
-    dmaDescRX[i].begin(&(dmaBufferRX[i*length]),length);
-    dmaDescRX[i].linkTo(dmaDescRX[(i+1)%descs]);
+void GDMASPI::setHardwareCSEnabled(bool enabled){
+  if(enabled){
+    spiSSEnable(spi);
+  }else{
+    spiSSDisable(spi);
   }
-  
-    
-  spi->dev->ms_dlen.ms_data_bitlen = length*8-1;
-  startDMA();
+}
+
+void GDMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
+  if(dmaDescTX){
+    for(uint32_t i=0;i<txDescCount;i++) dmaDescTX[i].end();
+    heap_caps_free(dmaDescTX);
+  }
+  if(dmaDescRX){
+    for(uint32_t i=0;i<rxDescCount;i++) dmaDescRX[i].end();
+    heap_caps_free(dmaDescRX);
+  }
+  txDescCount = txDescs;
+  rxDescCount = rxDescs;
+  dmaDescTX = (GDMADesc*)heap_caps_malloc(sizeof(GDMADesc)*txDescs, MALLOC_CAP_DMA);
+  dmaDescRX = (GDMADesc*)heap_caps_malloc(sizeof(GDMADesc)*rxDescs, MALLOC_CAP_DMA);
+  for(uint8_t i=0;i<txDescs;i++){
+    dmaDescTX[i].begin(dataLen);
+    dmaDescTX[i].linkNext(dmaDescTX[(i+1)%txDescs]);
+  }
+  for(uint8_t i=0;i<rxDescs;i++){
+    dmaDescRX[i].begin(dataLen);
+    dmaDescRX[i].linkNext(dmaDescRX[(i+1)%rxDescs]);
+  }
+  dmaDataLength = dataLen;
+  spi->dev->cmd.update = 1;
+}
+
+void GDMASPI::startDMA(GDMADesc *tx,GDMADesc *rx){
+  gdma_start(dmaChannelTX, (intptr_t)tx);
+  gdma_start(dmaChannelRX, (intptr_t)rx);
+  spi->dev->ms_dlen.ms_data_bitlen = dmaDataLength*8-1;
+  spi->dev->dma_conf.dma_tx_ena = 1;
+  spi->dev->dma_conf.dma_rx_ena = 1;
   spi->dev->cmd.update = 1;
 }
 
 void GDMASPI::startDMA(){
-
-  gdma_start(dmaChannelTX, (intptr_t)dmaDescTX);
-  gdma_start(dmaChannelRX, (intptr_t)dmaDescRX);
-  
-  spi->dev->dma_conf.dma_tx_ena = 1;
-  spi->dev->dma_conf.dma_rx_ena = 1;
-  spi->dev->cmd.update = 1;
+  startDMA(dmaDescTX,dmaDescRX);
 }
 
 void GDMASPI::stopDMA(){
@@ -114,4 +127,15 @@ void GDMASPI::registerCallBack(GDMASPICallBack cb){
     .on_recv_eof = cb
   };
   gdma_register_rx_event_callbacks(dmaChannelRX, &rx_cbs, NULL);  // Enable DMA transfer callback
+}
+
+GDMASPI::~GDMASPI(){
+  if(dmaDescTX){
+    for(uint32_t i=0;i<txDescCount;i++) dmaDescTX[i].end();
+    heap_caps_free(dmaDescTX);
+  }
+  if(dmaDescRX){
+    for(uint32_t i=0;i<rxDescCount;i++) dmaDescRX[i].end();
+    heap_caps_free(dmaDescRX);
+  }
 }
