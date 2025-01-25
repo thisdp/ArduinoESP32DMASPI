@@ -1,20 +1,6 @@
+#if CONFIG_IDF_TARGET_ESP32S3
 #include "ArduinoESP32GDMASPI.h"
 #include "esp32-hal-spi.h"
-
-void GDMADesc::begin(uint16_t bufferSize){
-  if(bufferSize >= 0xFFF) bufferSize = 0xFFF;
-  buffer = (uint8_t *)heap_caps_malloc(bufferSize,MALLOC_CAP_DMA);
-  memset(buffer,0,bufferSize);
-  size = bufferSize;
-  length = bufferSize;
-  owner = 1;
-  suc_eof = 0;
-  err_eof = 0;
-}
-
-void GDMADesc::end(){
-  if(buffer) heap_caps_free(buffer);
-}
 
 GDMASPI::GDMASPI(uint8_t host):SPIHost(host){}
 
@@ -87,8 +73,8 @@ void GDMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
   }
   txDescCount = txDescs;
   rxDescCount = rxDescs;
-  dmaDescTX = (GDMADesc*)heap_caps_malloc(sizeof(GDMADesc)*txDescs, MALLOC_CAP_DMA);
-  dmaDescRX = (GDMADesc*)heap_caps_malloc(sizeof(GDMADesc)*rxDescs, MALLOC_CAP_DMA);
+  dmaDescTX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*txDescs, MALLOC_CAP_DMA);
+  dmaDescRX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*rxDescs, MALLOC_CAP_DMA);
   for(uint8_t i=0;i<txDescs;i++){
     dmaDescTX[i].begin(dataLen);
     dmaDescTX[i].linkNext(dmaDescTX[(i+1)%txDescs]);
@@ -101,7 +87,7 @@ void GDMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
   spi->dev->cmd.update = 1;
 }
 
-void GDMASPI::startDMA(GDMADesc *tx,GDMADesc *rx){
+void GDMASPI::startDMA(DMADesc *tx,DMADesc *rx){
   gdma_start(dmaChannelTX, (intptr_t)tx);
   gdma_start(dmaChannelRX, (intptr_t)rx);
   spi->dev->ms_dlen.ms_data_bitlen = dmaDataLength*8-1;
@@ -139,3 +125,4 @@ GDMASPI::~GDMASPI(){
     heap_caps_free(dmaDescRX);
   }
 }
+#endif

@@ -1,27 +1,12 @@
+#if CONFIG_IDF_TARGET_ESP32
 #include "ArduinoESP32DMASPI.h"
 #include "esp32-hal-spi.h"
 #include "driver/periph_ctrl.h"
-#include "esp32-hal-spi.h"
-#include "esp32-hal.h"
-#include "esp_attr.h"
 #include "soc/spi_reg.h"
 #include "soc/spi_struct.h"
-#include "soc/io_mux_reg.h"
 #include "soc/gpio_sig_map.h"
 #include "soc/dport_reg.h"
-#include "driver/periph_ctrl.h"
 #include <driver/spi_common.h>
-
-void DMADesc::begin(uint8_t *inputBuffer, uint16_t bufferSize){
-  if(bufferSize >= 0xFFF) bufferSize = 0xFFF;
-  buffer = inputBuffer;
-  memset(buffer,0,bufferSize);
-  size = bufferSize;
-  length = bufferSize;
-  owner = 1;
-  suc_eof = 0;
-  err_eof = 0;
-}
 
 DMASPI::DMASPI(uint8_t host):SPIHost(host){}
 
@@ -42,51 +27,63 @@ void DMASPI::begin(int sck, int miso, int mosi, int cs) {
   spiSSEnable(spi);
   dmaDescTX = 0;
   dmaDescRX = 0;
- 
-
   spi->dev->mosi_dlen.usr_mosi_dbitlen  = 0;
   spi->dev->miso_dlen.usr_miso_dbitlen  = 0;
-  
-  SPISettings settings(10000000*8,SPI_MSBFIRST,SPI_MODE0);
+  SPISettings settings(10000000*4,SPI_MSBFIRST,SPI_MODE0);
   beginTransaction(settings);
-  
 }
 
-void DMASPI::initDMA(uint32_t descs, uint16_t length){
-  if(dmaDescTX) delete dmaDescTX;
-  if(dmaDescRX) delete dmaDescRX;
-  if(dmaBufferTX) delete dmaBufferTX;
-  if(dmaBufferRX) delete dmaBufferRX;
-  dmaDescTX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*descs, MALLOC_CAP_DMA);
-  dmaDescRX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*descs, MALLOC_CAP_DMA);
-  dmaBufferTX = (uint8_t*)heap_caps_malloc(length*descs, MALLOC_CAP_DMA);
-  dmaBufferRX = (uint8_t*)heap_caps_malloc(length*descs, MALLOC_CAP_DMA);
-  for(uint8_t i=0;i<descs;i++){
-    dmaDescTX[i].begin(&(dmaBufferTX[i*length]),length);
-    dmaDescTX[i].linkTo(dmaDescTX[(i+1)%descs]);
-    dmaDescRX[i].begin(&(dmaBufferRX[i*length]),length);
-    dmaDescRX[i].linkTo(dmaDescRX[(i+1)%descs]);
+void DMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
+  if(dmaDescTX){
+    for(uint32_t i=0;i<txDescCount;i++) dmaDescTX[i].end();
+    heap_caps_free(dmaDescTX);
   }
+  if(dmaDescRX){
+    for(uint32_t i=0;i<rxDescCount;i++) dmaDescRX[i].end();
+    heap_caps_free(dmaDescRX);
+  }
+  txDescCount = txDescs;
+  rxDescCount = rxDescs;
+  dmaDescTX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*txDescs, MALLOC_CAP_DMA);
+  dmaDescRX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*rxDescs, MALLOC_CAP_DMA);
+  for(uint8_t i=0;i<txDescs;i++){
+    dmaDescTX[i].begin(dataLen);
+    dmaDescTX[i].linkNext(dmaDescTX[(i+1)%txDescs]);
+  }
+  for(uint8_t i=0;i<rxDescs;i++){
+    dmaDescRX[i].begin(dataLen);
+    dmaDescRX[i].linkNext(dmaDescRX[(i+1)%rxDescs]);
+  }
+  dmaDataLength = dataLen;
+}
+
+void DMASPI::startDMA(DMADesc *tx,DMADesc *rx, bool continuous){
   spi->dev->mosi_dlen.usr_mosi_dbitlen = length*8-1;
   spi->dev->miso_dlen.usr_miso_dbitlen = length*8-1;
-}
-
-void DMASPI::startDMA(bool continuous){
-  spi->dev->dma_in_link.addr = (uint32_t)dmaDescRX & 0xFFFFF;
-  spi->dev->dma_out_link.addr = (uint32_t)dmaDescTX & 0xFFFFF;
+  spi->dev->dma_in_link.addr = (uint32_t)rx & 0xFFFFF;
+  spi->dev->dma_out_link.addr = (uint32_t)tx & 0xFFFFF;
   spi->dev->dma_conf.dma_continue = continuous;
+}
+void DMASPI::startDMA(bool continuous){
+  startDMA(dmaDescTX,dmaDescRX,continuous);
 }
 
 void DMASPI::stopDMA(){
   spi->dev->dma_conf.dma_continue = 0;
   spi->dev->dma_in_link.start = 0;
   spi->dev->dma_out_link.start = 0;
+  spi->dev->dma_in_link.addr = 0;
+  spi->dev->dma_out_link.addr = 0;
 }
-/*
-void DMASPI::registerCallBack(DMASPICallBack cb){
-  static gdma_rx_event_callbacks_t rx_cbs = {
-    .on_recv_eof = cb
-  };
-  gdma_register_rx_event_callbacks(dmaChannelRX, &rx_cbs, NULL);  // Enable DMA transfer callback
+
+DMASPI::~DMASPI(){
+  if(dmaDescTX){
+    for(uint32_t i=0;i<txDescCount;i++) dmaDescTX[i].end();
+    heap_caps_free(dmaDescTX);
+  }
+  if(dmaDescRX){
+    for(uint32_t i=0;i<rxDescCount;i++) dmaDescRX[i].end();
+    heap_caps_free(dmaDescRX);
+  }
 }
-*/
+#endif
