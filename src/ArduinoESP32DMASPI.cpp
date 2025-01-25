@@ -1,5 +1,5 @@
-#if CONFIG_IDF_TARGET_ESP32
 #include "ArduinoESP32DMASPI.h"
+#if CONFIG_IDF_TARGET_ESP32
 #include "esp32-hal-spi.h"
 #include "driver/periph_ctrl.h"
 #include "soc/spi_reg.h"

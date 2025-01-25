@@ -1,5 +1,5 @@
-#if CONFIG_IDF_TARGET_ESP32S3
 #include "ArduinoESP32GDMASPI.h"
+#if CONFIG_IDF_TARGET_ESP32S3
 #include "esp32-hal-spi.h"
 
 GDMASPI::GDMASPI(uint8_t host):SPIHost(host){}
