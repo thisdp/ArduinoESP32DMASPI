@@ -2,12 +2,27 @@
 #if CONFIG_IDF_TARGET_ESP32S3
 #include "esp32-hal-spi.h"
 
-GDMASPI::GDMASPI(uint8_t host):SPIHost(host){}
+GDMASPI::GDMASPI(uint8_t host) : SPIClass(host),
+  dmaDescTX(0),
+  dmaDescRX(0),
+  txDescCount(0),
+  rxDescCount(0),
+  dmaDataLength(0),
+  spi(0),
+  SPIHost(host){}
 
 void GDMASPI::begin(int sck, int miso, int mosi, int cs) {
   SPIClass::begin(sck, miso, mosi, cs);
   spi = SPIClass::bus();
   spiAttachSS(spi, 0, cs);
+  if(dmaDescTX){
+    for(uint32_t i=0;i<txDescCount;i++) dmaDescTX[i].end();
+    heap_caps_free(dmaDescTX);
+  }
+  if(dmaDescRX){
+    for(uint32_t i=0;i<rxDescCount;i++) dmaDescRX[i].end();
+    heap_caps_free(dmaDescRX);
+  }
   dmaDescTX = 0;
   dmaDescRX = 0;
   //TX

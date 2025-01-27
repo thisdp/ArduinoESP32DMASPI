@@ -1,14 +1,17 @@
 #include "ArduinoESP32DMASPI.h"
 #if CONFIG_IDF_TARGET_ESP32
-#include "esp32-hal-spi.h"
 #include "driver/periph_ctrl.h"
-#include "soc/spi_reg.h"
-#include "soc/spi_struct.h"
-#include "soc/gpio_sig_map.h"
 #include "soc/dport_reg.h"
 #include <driver/spi_common.h>
 
-DMASPI::DMASPI(uint8_t host):SPIHost(host){}
+DMASPI::DMASPI(uint8_t host) : SPIClass(host),
+  dmaDescTX(0),
+  dmaDescRX(0),
+  txDescCount(0),
+  rxDescCount(0),
+  dmaDataLength(0),
+  spi(0),
+  SPIHost(host){}
 
 void DMASPI::begin(int sck, int miso, int mosi, int cs) {
   DPORT_SET_PERI_REG_MASK(DPORT_PERIP_CLK_EN_REG, DPORT_SPI_DMA_CLK_EN);
@@ -25,6 +28,14 @@ void DMASPI::begin(int sck, int miso, int mosi, int cs) {
   spi->dev->dma_conf.val &= ~(SPI_OUT_RST|SPI_IN_RST|SPI_AHBM_RST|SPI_AHBM_FIFO_RST);
   spiAttachSS(spi, 0, cs);
   spiSSEnable(spi);
+  if(dmaDescTX){
+    for(uint32_t i=0;i<txDescCount;i++) dmaDescTX[i].end();
+    heap_caps_free(dmaDescTX);
+  }
+  if(dmaDescRX){
+    for(uint32_t i=0;i<rxDescCount;i++) dmaDescRX[i].end();
+    heap_caps_free(dmaDescRX);
+  }
   dmaDescTX = 0;
   dmaDescRX = 0;
   spi->dev->mosi_dlen.usr_mosi_dbitlen  = 0;
@@ -33,6 +44,13 @@ void DMASPI::begin(int sck, int miso, int mosi, int cs) {
   beginTransaction(settings);
 }
 
+void DMASPI::setHardwareCSEnabled(bool enabled){
+  if(enabled){
+    spiSSEnable(spi);
+  }else{
+    spiSSDisable(spi);
+  }
+}
 void DMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
   if(dmaDescTX){
     for(uint32_t i=0;i<txDescCount;i++) dmaDescTX[i].end();
@@ -58,8 +76,8 @@ void DMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
 }
 
 void DMASPI::startDMA(DMADesc *tx,DMADesc *rx, bool continuous){
-  spi->dev->mosi_dlen.usr_mosi_dbitlen = length*8-1;
-  spi->dev->miso_dlen.usr_miso_dbitlen = length*8-1;
+  spi->dev->mosi_dlen.usr_mosi_dbitlen = dmaDataLength*8-1;
+  spi->dev->miso_dlen.usr_miso_dbitlen = dmaDataLength*8-1;
   spi->dev->dma_in_link.addr = (uint32_t)rx & 0xFFFFF;
   spi->dev->dma_out_link.addr = (uint32_t)tx & 0xFFFFF;
   spi->dev->dma_conf.dma_continue = continuous;

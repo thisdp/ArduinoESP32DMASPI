@@ -2,6 +2,9 @@
 #include "Arduino.h"
 #if CONFIG_IDF_TARGET_ESP32
 #include "ArduinoESP32DMADesc.h"
+#include "esp32-hal-spi.h"
+#include "soc/spi_reg.h"
+#include "soc/spi_struct.h"
 #include "driver/spi_master.h"
 #include <SPI.h>
 
@@ -22,6 +25,7 @@ public:
   void startDMA(bool continuous = false);
   void startDMA(DMADesc *tx,DMADesc *rx, bool continuous = false);
   void stopDMA();
+  void setHardwareCSEnabled(bool enabled);
   inline void triggerTransfer(){
     spi->dev->dma_in_link.start = 1;    //使能一次DMA操作
     spi->dev->dma_out_link.start = 1;   //使能一次DMA操作
