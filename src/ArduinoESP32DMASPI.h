@@ -26,7 +26,26 @@ public:
   void startDMA(DMADesc *tx,DMADesc *rx, bool continuous = false);
   void stopDMA();
   void setHardwareCSEnabled(bool enabled);
+  inline uint32_t getCurrentRXDesc(){ return spi->dev->dma_inlink_dscr; }
+  inline uint32_t getCurrentRXBuffer(){ return spi->dev->dma_inlink_dscr_bf1; }
+  inline uint32_t getNextRXDesc(){ return spi->dev->dma_inlink_dscr_bf0; }
+  inline uint32_t getCurrentTXDesc(){ return spi->dev->dma_outlink_dscr; }
+  inline uint32_t getCurrentTXBuffer(){ return spi->dev->dma_outlink_dscr_bf1; }
+  inline uint32_t getNextTXDesc(){ return spi->dev->dma_outlink_dscr_bf0; }
   inline void triggerTransfer(){
+    /*Serial.print("RX Desc:");
+    Serial.println(getCurrentRXDesc());
+    Serial.print("RX Buffer:");
+    Serial.println(getCurrentRXBuffer());
+    Serial.print("RX Next Desc:");
+    Serial.println(getNextRXDesc());
+    Serial.print("TX Desc:");
+    Serial.println(getCurrentTXDesc());
+    Serial.print("TX Buffer:");
+    Serial.println(getCurrentTXBuffer());
+    Serial.print("TX Next Desc:");
+    Serial.println(getNextTXDesc());*/
+
     spi->dev->dma_in_link.start = 1;    //使能一次DMA操作
     spi->dev->dma_out_link.start = 1;   //使能一次DMA操作
     spi->dev->cmd.usr = 1;              //使能一次SPI操作

@@ -3,6 +3,8 @@
 #include "Arduino.h"
 using namespace std;
 
+#pragma pack(push, 1)
+
 class DMADesc {
 public:
     DMADesc();
@@ -10,13 +12,15 @@ public:
     void end();
     uint16_t begin(uint16_t bufferSize);
     bool hasError();
+    void clearError();
     bool isLast();
     void setLast(bool isLast);
     bool isOwnedByDMA();
     void setOwnedByDMA(bool ownedByDMA);
     void linkNext(DMADesc* nextDMADesc);
     void linkNext(DMADesc& nextDMADesc);
-    void* getBuffer();
+    DMADesc* getNext();
+    uint8_t* getBuffer();
     bool hasBuffer();
 private:
     union {
@@ -34,6 +38,8 @@ private:
     void* buffer;                   /*!< Pointer to the buffer */
     DMADesc* next;                  /*!< Pointer to the next descriptor (set to NULL if the descriptor is the last one, e.g. suc_eof=1) */
 };
+
+#pragma pack(pop)
 
 class DMADescManager {  //DMA Description Manager，防止难受
 public:

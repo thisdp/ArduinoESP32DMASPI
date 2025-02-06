@@ -11,26 +11,29 @@ void DMADesc::end() {
 };
 
 uint16_t DMADesc::begin(uint16_t bufferSize){
+    end();  //Clear previous if exists
     if(bufferSize >= 0xFFF) bufferSize = 0xFFF;
     buffer = (uint8_t *)heap_caps_malloc(bufferSize,MALLOC_CAP_DMA);
     if(buffer == nullptr) return 0;
     memset(buffer,0,bufferSize);
     size = bufferSize;
     length = bufferSize;
-    owner = 1;
-    suc_eof = 0;
-    err_eof = 0;
+    setOwnedByDMA(true);
+    setLast(false);
+    clearError();
     return bufferSize;
 }
 
 bool DMADesc::hasError(){ return err_eof; }
+void DMADesc::clearError() { err_eof = 0; }
 bool DMADesc::isLast(){ return suc_eof; }
 void DMADesc::setLast(bool isLast){ suc_eof = isLast; }
 bool DMADesc::isOwnedByDMA(){ return owner; }
 void DMADesc::setOwnedByDMA(bool ownedByDMA){ owner = ownedByDMA; }
 void DMADesc::linkNext(DMADesc* nextDMADesc){ next = nextDMADesc; }
 void DMADesc::linkNext(DMADesc& nextDMADesc){ next = &nextDMADesc; }
-void* DMADesc::getBuffer() { return buffer; }
+DMADesc* DMADesc::getNext() { return next; }
+uint8_t* DMADesc::getBuffer() { return (uint8_t*)buffer; }
 bool DMADesc::hasBuffer() { return buffer != nullptr; }
 
 
