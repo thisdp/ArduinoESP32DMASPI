@@ -1,6 +1,15 @@
 #include "ArduinoESP32DMADesc.h"
 #include <string.h> // For memset
 
+int alignRound(int value, int alignment) {
+    // 如果value已经是alignment的倍数，则直接返回value
+    if (value % alignment == 0) {
+        return value;
+    }
+    // 否则，计算并返回下一个alignment的倍数
+    return ((value / alignment) + 1) * alignment;
+}
+
 DMADesc::DMADesc() : descWord(0), buffer(nullptr), next(nullptr) {}
 
 DMADesc::~DMADesc() { end(); }
@@ -13,7 +22,8 @@ void DMADesc::end() {
 uint16_t DMADesc::begin(uint16_t bufferSize){
     end();  //Clear previous if exists
     if(bufferSize >= 0xFFF) bufferSize = 0xFFF;
-    buffer = (uint8_t *)heap_caps_malloc(bufferSize,MALLOC_CAP_DMA);
+    
+    buffer = (uint8_t *)heap_caps_aligned_alloc(4,bufferSize,MALLOC_CAP_DMA);
     if(buffer == nullptr) return 0;
     memset(buffer,0,bufferSize);
     size = bufferSize;
@@ -35,7 +45,6 @@ void DMADesc::linkNext(DMADesc& nextDMADesc){ next = &nextDMADesc; }
 DMADesc* DMADesc::getNext() { return next; }
 uint8_t* DMADesc::getBuffer() { return (uint8_t*)buffer; }
 bool DMADesc::hasBuffer() { return buffer != nullptr; }
-
 
 DMADescManager::~DMADescManager() {
     clearDescs();

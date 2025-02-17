@@ -22,7 +22,7 @@ public:
     DMADesc* getNext();
     uint8_t* getBuffer();
     bool hasBuffer();
-private:
+//private:
     union {
         struct {
             uint32_t size : 12;         /*!< Buffer size */

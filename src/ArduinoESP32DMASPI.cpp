@@ -40,7 +40,7 @@ void DMASPI::begin(int sck, int miso, int mosi, int cs) {
   dmaDescRX = 0;
   spi->dev->mosi_dlen.usr_mosi_dbitlen  = 0;
   spi->dev->miso_dlen.usr_miso_dbitlen  = 0;
-  SPISettings settings(10000000*4,SPI_MSBFIRST,SPI_MODE0);
+  SPISettings settings(10000000*2,SPI_MSBFIRST,SPI_MODE0);
   beginTransaction(settings);
 }
 
@@ -51,6 +51,8 @@ void DMASPI::setHardwareCSEnabled(bool enabled){
     spiSSDisable(spi);
   }
 }
+
+//如果dataLen不是8的倍数，则会出现错位问题，待解决
 void DMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
   if(dmaDescTX){
     for(uint32_t i=0;i<txDescCount;i++) dmaDescTX[i].end();
@@ -62,8 +64,8 @@ void DMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
   }
   txDescCount = txDescs;
   rxDescCount = rxDescs;
-  dmaDescTX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*txDescs, MALLOC_CAP_DMA);
-  dmaDescRX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*rxDescs, MALLOC_CAP_DMA);
+  dmaDescTX = (DMADesc*)heap_caps_aligned_alloc(8,sizeof(DMADesc)*txDescs, MALLOC_CAP_DMA);
+  dmaDescRX = (DMADesc*)heap_caps_aligned_alloc(8,sizeof(DMADesc)*rxDescs, MALLOC_CAP_DMA);
   memset(dmaDescTX,0,sizeof(DMADesc)*txDescs);
   memset(dmaDescRX,0,sizeof(DMADesc)*rxDescs);
   for(uint8_t i=0;i<txDescs;i++){
@@ -80,9 +82,15 @@ void DMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
 void DMASPI::startDMA(DMADesc *tx,DMADesc *rx, bool continuous){
   spi->dev->mosi_dlen.usr_mosi_dbitlen = dmaDataLength*8-1;
   spi->dev->miso_dlen.usr_miso_dbitlen = dmaDataLength*8-1;
-  spi->dev->dma_in_link.addr = (uint32_t)rx & 0xFFFFF;
-  spi->dev->dma_out_link.addr = (uint32_t)tx & 0xFFFFF;
+  dma_tx_reset();
+  dma_tx_prepare();
+  dma_tx_load(tx);
+  dma_rx_reset();
+  dma_rx_prepare();
+  dma_rx_load(rx);
   spi->dev->dma_conf.dma_continue = continuous;
+  triggerDMARX();
+  triggerDMATX();
 }
 void DMASPI::startDMA(bool continuous){
   startDMA(dmaDescTX,dmaDescRX,continuous);
