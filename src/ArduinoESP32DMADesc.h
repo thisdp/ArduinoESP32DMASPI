@@ -22,6 +22,7 @@ public:
     DMADesc* getNext();
     uint8_t* getBuffer();
     bool hasBuffer();
+	void clear();
 //private:
     union {
         struct {

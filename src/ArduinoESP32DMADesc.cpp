@@ -45,6 +45,11 @@ void DMADesc::linkNext(DMADesc& nextDMADesc){ next = &nextDMADesc; }
 DMADesc* DMADesc::getNext() { return next; }
 uint8_t* DMADesc::getBuffer() { return (uint8_t*)buffer; }
 bool DMADesc::hasBuffer() { return buffer != nullptr; }
+void DMADesc::clear() {
+	descWord = 0;
+	buffer = 0;
+	next = 0;
+}
 
 DMADescManager::~DMADescManager() {
     clearDescs();

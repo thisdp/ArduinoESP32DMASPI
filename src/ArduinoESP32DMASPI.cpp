@@ -66,13 +66,13 @@ void DMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
   rxDescCount = rxDescs;
   dmaDescTX = (DMADesc*)heap_caps_aligned_alloc(8,sizeof(DMADesc)*txDescs, MALLOC_CAP_DMA);
   dmaDescRX = (DMADesc*)heap_caps_aligned_alloc(8,sizeof(DMADesc)*rxDescs, MALLOC_CAP_DMA);
-  memset(dmaDescTX,0,sizeof(DMADesc)*txDescs);
-  memset(dmaDescRX,0,sizeof(DMADesc)*rxDescs);
-  for(uint8_t i=0;i<txDescs;i++){
+  for(uint32_t i=0;i<txDescs;i++) dmaDescTX[i].clear();
+  for(uint32_t i=0;i<rxDescs;i++) dmaDescRX[i].clear();
+  for(uint32_t i=0;i<txDescs;i++){
     dmaDescTX[i].begin(dataLen);
     dmaDescTX[i].linkNext(dmaDescTX[(i+1)%txDescs]);
   }
-  for(uint8_t i=0;i<rxDescs;i++){
+  for(uint32_t i=0;i<rxDescs;i++){
     dmaDescRX[i].begin(dataLen);
     dmaDescRX[i].linkNext(dmaDescRX[(i+1)%rxDescs]);
   }

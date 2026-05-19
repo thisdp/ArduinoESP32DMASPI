@@ -90,8 +90,8 @@ void GDMASPI::initDMA(uint32_t txDescs, uint32_t rxDescs, uint16_t dataLen){
   rxDescCount = rxDescs;
   dmaDescTX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*txDescs, MALLOC_CAP_DMA);
   dmaDescRX = (DMADesc*)heap_caps_malloc(sizeof(DMADesc)*rxDescs, MALLOC_CAP_DMA);
-  memset(dmaDescTX,0,sizeof(DMADesc)*txDescs);
-  memset(dmaDescRX,0,sizeof(DMADesc)*rxDescs);
+  for(uint32_t i=0;i<txDescs;i++) dmaDescTX[i].clear();
+  for(uint32_t i=0;i<rxDescs;i++) dmaDescRX[i].clear();
   for(uint8_t i=0;i<txDescs;i++){
     dmaDescTX[i].begin(dataLen);
     dmaDescTX[i].linkNext(dmaDescTX[(i+1)%txDescs]);
